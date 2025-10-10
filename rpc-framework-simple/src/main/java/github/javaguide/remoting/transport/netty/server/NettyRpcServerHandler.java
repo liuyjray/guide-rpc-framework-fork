@@ -45,10 +45,13 @@ public class NettyRpcServerHandler extends ChannelInboundHandlerAdapter {
                 RpcMessage rpcMessage = new RpcMessage();
                 rpcMessage.setCodec(SerializationTypeEnum.HESSIAN.getCode());
                 rpcMessage.setCompress(CompressTypeEnum.GZIP.getCode());
+
                 if (messageType == RpcConstants.HEARTBEAT_REQUEST_TYPE) {
+                    // 处理心跳请求
                     rpcMessage.setMessageType(RpcConstants.HEARTBEAT_RESPONSE_TYPE);
                     rpcMessage.setData(RpcConstants.PONG);
                 } else {
+                    // 处理RPC请求
                     RpcRequest rpcRequest = (RpcRequest) ((RpcMessage) msg).getData();
                     // Execute the target method (the method the client needs to execute) and return the method result
                     Object result = rpcRequestHandler.handle(rpcRequest);

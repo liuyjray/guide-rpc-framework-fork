@@ -45,7 +45,7 @@ public final class NettyRpcClient implements RpcRequestTransport {
     private final EventLoopGroup eventLoopGroup;
 
     public NettyRpcClient() {
-        // initialize resources such as EventLoopGroup, Bootstrap
+        // 1. 初始化客户端启动器
         eventLoopGroup = new NioEventLoopGroup();
         bootstrap = new Bootstrap();
         bootstrap.group(eventLoopGroup)
@@ -104,6 +104,7 @@ public final class NettyRpcClient implements RpcRequestTransport {
                     .codec(SerializationTypeEnum.HESSIAN.getCode())
                     .compress(CompressTypeEnum.GZIP.getCode())
                     .messageType(RpcConstants.REQUEST_TYPE).build();
+
             channel.writeAndFlush(rpcMessage).addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {
                     log.info("client send message: [{}]", rpcMessage);

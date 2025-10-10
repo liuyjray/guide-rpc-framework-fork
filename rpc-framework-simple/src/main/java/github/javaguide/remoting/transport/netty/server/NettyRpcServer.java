@@ -23,6 +23,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.net.InetAddress;
+import java.sql.Array;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -48,13 +51,16 @@ public class NettyRpcServer {
     public void start() {
         CustomShutdownHook.getCustomShutdownHook().clearAll();
         String host = InetAddress.getLocalHost().getHostAddress();
+        // 1. 创建线程组
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         DefaultEventExecutorGroup serviceHandlerGroup = new DefaultEventExecutorGroup(
                 RuntimeUtil.cpus() * 2,
                 ThreadPoolFactoryUtil.createThreadFactory("service-handler-group", false)
         );
+
         try {
+            // 2. 配置服务端启动器
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
@@ -71,6 +77,7 @@ public class NettyRpcServer {
                         protected void initChannel(SocketChannel ch) {
                             // 30 秒之内没有收到客户端请求的话就关闭连接
                             ChannelPipeline p = ch.pipeline();
+                            // 3. 配置处理器链
                             p.addLast(new IdleStateHandler(30, 0, 0, TimeUnit.SECONDS));
                             p.addLast(new RpcMessageEncoder());
                             p.addLast(new RpcMessageDecoder());
