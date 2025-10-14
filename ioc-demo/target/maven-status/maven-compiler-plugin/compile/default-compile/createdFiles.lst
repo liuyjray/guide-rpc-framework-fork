@@ -1,0 +1,5 @@
+com/example/ioc/SimpleIocDemo.class
+com/example/ioc/UserService.class
+com/example/ioc/UserServiceWithIoc.class
+com/example/ioc/Database.class
+com/example/ioc/SimpleIocContainer.class
