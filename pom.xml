@@ -34,6 +34,7 @@
         <module>example-client</module>
         <module>example-server</module>
         <module>rpc-framework-common</module>
+        <module>elasticsearch-demo</module>
     </modules>
     <dependencies>
         <!-- lombok -->
