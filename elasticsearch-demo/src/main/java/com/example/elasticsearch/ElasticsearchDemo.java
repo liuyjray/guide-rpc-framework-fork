@@ -1,6 +1,9 @@
 package com.example.elasticsearch;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Elasticsearch 示例程序
@@ -112,8 +115,23 @@ public class ElasticsearchDemo {
             // 等待索引刷新
             Thread.sleep(1000);
 
-            // 示例11: 批量删除文档
-            System.out.println("\n【示例11】批量删除文档 - 删除所有星巴克:");
+            // 示例11: 高亮搜索
+            System.out.println("\n【示例11】高亮搜索 - 搜索 '肯德基' 并高亮显示:");
+            System.out.println("----------------------------------------");
+            Map<Shop, String> highlightResults = esClient.searchWithHighlight("shop", "shopname", "肯德基");
+            System.out.println("共找到 " + highlightResults.size() + " 条结果:\n");
+            for (Map.Entry<Shop, String> entry : highlightResults.entrySet()) {
+                Shop shop = entry.getKey();
+                String highlight = entry.getValue();
+                System.out.println("商铺ID: " + shop.getShopId());
+                System.out.println("原始名称: " + shop.getShopName());
+                System.out.println("高亮显示: " + highlight);
+                System.out.println("地址: " + shop.getAddress());
+                System.out.println("---");
+            }
+
+            // 示例12: 批量删除文档
+            System.out.println("\n【示例12】批量删除文档 - 删除所有星巴克:");
             System.out.println("----------------------------------------");
             List<String> deleteIds = Arrays.asList("3000", "3001", "3002");
             int deleteCount = esClient.bulkDeleteShops("shop", deleteIds);

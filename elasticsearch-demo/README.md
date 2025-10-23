@@ -41,6 +41,9 @@ elasticsearch-demo/
 - ✅ **分组统计**: `aggregateByField()` - 按字段分组统计数量
 - ✅ **平均值计算**: `aggregateAvg()` - 计算字段平均值
 
+#### 高级功能
+- ✅ **高亮搜索**: `searchWithHighlight()` - 搜索结果高亮显示
+
 ### 2. **Shop** - 商铺实体类
 
 字段映射：
@@ -52,7 +55,7 @@ elasticsearch-demo/
 
 ### 3. **ElasticsearchDemo** - 示例程序
 
-演示了 11 个常见场景：
+演示了 12 个常见场景：
 1. 查询所有商铺
 2. 使用 match 查询搜索商铺名称
 3. 使用 term 查询搜索城市ID
@@ -63,7 +66,8 @@ elasticsearch-demo/
 8. **聚合查询** - 按城市统计商铺数量
 9. **聚合查询** - 计算平均 shopid
 10. **删除单个文档**
-11. **批量删除文档**
+11. **高亮搜索** - 搜索结果高亮显示
+12. **批量删除文档**
 
 ## 索引 Schema
 
@@ -245,12 +249,109 @@ Shop{shopId=1001, shopName='肯德基', cityId=1, address='浦江镇召楼路197
 
 #### Match 查询 vs Term 查询
 
+**核心区别:**
+
+| 特性 | **Match Query** | **Term Query** |
+|------|----------------|---------------|
+| **是否分词** | ✅ 会分词 | ❌ 不分词 |
+| **查询方式** | 全文搜索 | 精确匹配 |
+| **适用字段** | `text` 类型 | `keyword`、`integer`、`date` 等 |
+| **使用场景** | 搜索文本内容 | 精确查找、过滤 |
+| **性能** | 相对较慢 | 更快 |
+
+**代码示例:**
+
 ```java
-// Match 查询 - 会分词，适合中文搜索
+// Match 查询 - 会分词，适合中文全文搜索
 List<Shop> shops = esClient.searchByMatch("shop", "shopname", "肯德基");
 
 // Term 查询 - 精确匹配，适合 keyword、数字等类型
 List<Shop> shops = esClient.searchByTerm("shop", "cityid", 1);
+```
+
+**详细说明:**
+
+##### Match Query (全文搜索)
+
+```java
+// 搜索 "肯德基"
+esClient.searchByMatch("shop", "shopname", "肯德基");
+```
+
+**执行过程:**
+1. 对搜索词 "肯德基" 进行分词 → ["肯", "德", "基"]
+2. 在索引中查找包含这些词的文档
+3. 计算相关性评分
+4. 返回匹配的文档
+
+**适用场景:**
+- ✅ 搜索商铺名称、地址等文本内容
+- ✅ 中文全文搜索
+- ✅ 需要相关性评分的场景
+
+##### Term Query (精确匹配)
+
+```java
+// 精确查找 cityid = 1
+esClient.searchByTerm("shop", "cityid", 1);
+```
+
+**执行过程:**
+1. 不对搜索词进行分词
+2. 直接在倒排索引中查找完全匹配的词项
+3. 不计算相关性评分（或评分为固定值）
+4. 返回精确匹配的文档
+
+**适用场景:**
+- ✅ 精确查找数字、日期、布尔值
+- ✅ 精确匹配 keyword 字段
+- ✅ 过滤条件（如状态、类型等）
+
+**为什么 Term 查询搜不到中文?**
+
+```java
+// ❌ 错误示例 - 搜不到结果
+esClient.searchByTerm("shop", "shopname", "肯德基");
+```
+
+**原因分析:**
+
+1. **索引时**: `shopname` 是 `text` 类型，"肯德基" 被分词为 ["肯", "德", "基"]
+2. **查询时**: Term 查询不分词，直接查找 "肯德基" 这个完整词
+3. **结果**: 索引中没有 "肯德基" 这个完整词，所以搜不到
+
+**倒排索引示例:**
+
+```
+索引中存储的词项:
+"肯" → [doc1, doc2, doc3]
+"德" → [doc1, doc2, doc3]
+"基" → [doc1, doc2, doc3]
+
+Term 查询 "肯德基" → 找不到这个词项 → 返回空结果
+Match 查询 "肯德基" → 分词后查找 ["肯", "德", "基"] → 找到 doc1, doc2, doc3
+```
+
+**解决方案:**
+
+**方案1: 使用 Match 查询 (推荐)**
+```java
+esClient.searchByMatch("shop", "shopname", "肯德基");
+```
+
+**方案2: 使用 keyword 子字段**
+```java
+// 需要索引定义了 shopname.keyword
+esClient.searchByTerm("shop", "shopname.keyword", "肯德基");
+```
+
+**方案3: 重建索引，将字段类型改为 keyword**
+```json
+{
+  "shopname": {
+    "type": "keyword"  // 不分词，支持精确匹配
+  }
+}
 ```
 
 ### 2. 批量操作
@@ -308,6 +409,26 @@ for (Map.Entry<String, Long> entry : cityStats.entrySet()) {
 Double avgShopId = esClient.aggregateAvg("shop", "shopid");
 System.out.println("平均 shopid: " + avgShopId);
 ```
+
+### 6. 高亮搜索
+
+```java
+// 搜索并高亮显示匹配的关键词
+Map<Shop, String> results = esClient.searchWithHighlight("shop", "shopname", "肯德基");
+
+for (Map.Entry<Shop, String> entry : results.entrySet()) {
+    Shop shop = entry.getKey();
+    String highlight = entry.getValue();
+
+    System.out.println("原始名称: " + shop.getShopName());
+    System.out.println("高亮显示: " + highlight);  // 输出: <em>肯</em><em>德</em><em>基</em>
+}
+```
+
+**高亮效果:**
+- 原始名称: `肯德基`
+- 高亮显示: `<em>肯</em><em>德</em><em>基</em>`
+- 前端渲染后: **肯德基** (加粗或高亮颜色)
 
 ### 为什么 term 查询搜不到中文？
 

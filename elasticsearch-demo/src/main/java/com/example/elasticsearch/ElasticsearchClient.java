@@ -22,6 +22,8 @@ import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.aggregations.metrics.Avg;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -352,6 +354,58 @@ public class ElasticsearchClient {
             logger.error("平均值聚合失败: index={}, field={}", index, fieldName, e);
             return null;
         }
+    }
+
+    /**
+     * 带高亮的搜索
+     * @param index 索引名称
+     * @param fieldName 字段名
+     * @param value 搜索值
+     * @return 搜索结果 Map (Shop对象 -> 高亮内容)
+     */
+    public Map<Shop, String> searchWithHighlight(String index, String fieldName, String value) {
+        Map<Shop, String> result = new HashMap<>();
+        try {
+            SearchRequest searchRequest = new SearchRequest(index);
+            SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+
+            // 使用 match 查询
+            sourceBuilder.query(QueryBuilders.matchQuery(fieldName, value));
+
+            // 配置高亮
+            HighlightBuilder highlightBuilder = new HighlightBuilder();
+            highlightBuilder.field(fieldName);  // 高亮字段
+            highlightBuilder.preTags("<em>");   // 高亮前缀标签
+            highlightBuilder.postTags("</em>"); // 高亮后缀标签
+            sourceBuilder.highlighter(highlightBuilder);
+
+            sourceBuilder.from(0);
+            sourceBuilder.size(10);
+
+            searchRequest.source(sourceBuilder);
+            SearchResponse response = client.search(searchRequest, RequestOptions.DEFAULT);
+
+            logger.info("高亮搜索完成: 找到 {} 条结果", response.getHits().getTotalHits().value);
+
+            for (SearchHit hit : response.getHits().getHits()) {
+                // 获取原始文档
+                Map<String, Object> sourceAsMap = hit.getSourceAsMap();
+                Shop shop = objectMapper.convertValue(sourceAsMap, Shop.class);
+
+                // 获取高亮内容
+                Map<String, HighlightField> highlightFields = hit.getHighlightFields();
+                String highlightText = "";
+                if (highlightFields.containsKey(fieldName)) {
+                    HighlightField highlightField = highlightFields.get(fieldName);
+                    highlightText = highlightField.getFragments()[0].string();
+                }
+
+                result.put(shop, highlightText);
+            }
+        } catch (IOException e) {
+            logger.error("高亮搜索失败: index={}, field={}, value={}", index, fieldName, value, e);
+        }
+        return result;
     }
 
     /**
